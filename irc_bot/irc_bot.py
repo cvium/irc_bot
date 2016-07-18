@@ -16,7 +16,7 @@ import ssl
 import socket
 import uuid
 
-from numeric_replies import REPLY_CODES
+from .numeric_replies import REPLY_CODES
 
 log = logging.getLogger('irc_bot')
 

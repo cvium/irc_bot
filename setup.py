@@ -11,4 +11,7 @@ setup(
   download_url='https://github.com/cvium/irc_bot/tarball/1.0',  # I'll explain this in a second
   keywords=['irc', 'bot'],  # arbitrary keywords
   classifiers=[],
+  install_requires=[
+    'future'
+  ],
 )
