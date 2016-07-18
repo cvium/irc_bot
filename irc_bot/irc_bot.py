@@ -331,6 +331,9 @@ class IRCBot(asynchat.async_chat):
     def nick(self, nickname):
         self.write('NICK %s' % nickname)
 
+    def part(self, channels):
+        self.write('PART %s' % ','.join(channels))
+
     def write(self, msg):
         log.debug('SENT: %s', msg)
         unencoded_msg = msg + '\r\n'
@@ -346,6 +349,9 @@ class IRCBot(asynchat.async_chat):
             asyncore.poll(timeout=1, map={self.socket: self})
             if set(self.channels) - set(self.connected_channels) and not self.connecting_to_channels:
                 self.schedule.queue_command(5, partial(self.join, self.channels))
+
+            # disconnect from unwanted channels
+            self.part(list(set(self.connected_channels) - set(self.channels)))
 
     def identify_with_nickserv(self):
         """
