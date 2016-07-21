@@ -220,10 +220,14 @@ class IRCBot(asynchat.async_chat):
         self.close()
 
     def reconnect(self):
-        self.reconnecting = False
-        self.connection_attempts += 1
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect((self.server, self.port))
+        try:
+            self.reconnecting = False
+            self.connection_attempts += 1
+            self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.connect((self.server, self.port))
+        except IOError as e:
+            log.error(e)
+            self.handle_error()
 
     def keepalive(self):
         self.write('PING %s' % self.server)
