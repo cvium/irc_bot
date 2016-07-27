@@ -118,7 +118,7 @@ class IRCBot(asynchat.async_chat):
 
     def __init__(self, config):
         asynchat.async_chat.__init__(self)
-        self.server = config['server']
+        self.servers = config['servers']
         self.port = config['port']
         self.channels = config['channels']
         self.nickname = config.get('nickname', 'Flexget-%s' % uuid.uuid4())
@@ -130,9 +130,6 @@ class IRCBot(asynchat.async_chat):
         self.connected_channels = []
         self.real_nickname = self.nickname
         self.set_terminator(b'\r\n')
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        log.info('Connecting to %s', (self.server, self.port))
-        self.connect((self.server, self.port))
         self.buffer = ''
         self.connection_attempts = 1
         self.max_connection_delay = 300  # 5 minutes
@@ -198,7 +195,7 @@ class IRCBot(asynchat.async_chat):
             self.socket.setblocking(False)
 
         self.reconnecting = False
-        log.info('Connected to server %s', self.server)
+        log.info('Connected to server %s', self.servers[0])
         self.write('USER %s %s %s :%s' % (self.real_nickname, '8', '*', self.real_nickname))
         self.nick(self.real_nickname)
 
@@ -215,7 +212,7 @@ class IRCBot(asynchat.async_chat):
             self.handle_error()
 
     def exit(self):
-        log.info('Shutting down connection to %s:%s', self.server, self.port)
+        log.info('Shutting down connection to %s:%s', self.servers[0], self.port)
         self.running = False
         self.close()
 
@@ -224,13 +221,15 @@ class IRCBot(asynchat.async_chat):
             self.reconnecting = False
             self.connection_attempts += 1
             self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.connect((self.server, self.port))
+            # change server
+            self.servers += [self.servers.pop(0)]
+            self.connect((self.servers[0], self.port))
         except IOError as e:
             log.error(e)
             self.handle_error()
 
     def keepalive(self):
-        self.write('PING %s' % self.server)
+        self.write('PING %s' % self.servers[0])
 
     def join(self, channels):
         for channel in channels:
@@ -273,7 +272,7 @@ class IRCBot(asynchat.async_chat):
         self.schedule.queue_command(5, partial(self.join, self.channels))
 
     def on_error(self, msg):
-        log.error('Received error message from %s: %s', self.server, msg.arguments[0])
+        log.error('Received error message from %s: %s', self.servers[0], msg.arguments[0])
         if 'throttled' in msg.raw or 'throttling' in msg.raw:
             self.throttled = True
 
@@ -285,7 +284,7 @@ class IRCBot(asynchat.async_chat):
             self.join([msg.arguments[1]])
 
     def on_rplmotdend(self, msg):
-        log.debug('Successfully connected to %s', self.server)
+        log.debug('Successfully connected to %s', self.servers[0])
         self.identify_with_nickserv()
 
     def on_privmsg(self, msg):
@@ -349,6 +348,9 @@ class IRCBot(asynchat.async_chat):
         self.exit()
 
     def start(self):
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        log.info('Connecting to %s', (self.servers[0], self.port))
+        self.connect((self.servers[0], self.port))
         while self.running:
             self.schedule.execute()
             asyncore.poll(timeout=1, map={self.socket: self})
