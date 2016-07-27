@@ -223,6 +223,7 @@ class IRCBot(asynchat.async_chat):
             self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
             # change server
             self.servers += [self.servers.pop(0)]
+            log.info('Connecting to %s', (self.servers[0], self.port))
             self.connect((self.servers[0], self.port))
         except IOError as e:
             log.error(e)
