@@ -336,7 +336,8 @@ class IRCBot(asynchat.async_chat):
         self.write('NICK %s' % nickname)
 
     def part(self, channels):
-        self.write('PART %s' % ','.join(channels))
+        if channels:
+            self.write('PART %s' % ','.join(channels))
 
     def write(self, msg):
         log.debug('SENT: %s', msg)
