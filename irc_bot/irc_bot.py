@@ -15,7 +15,6 @@ import re
 import ssl
 import socket
 import uuid
-from random import choice
 
 from .numeric_replies import REPLY_CODES
 
