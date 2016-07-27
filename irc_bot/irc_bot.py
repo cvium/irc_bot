@@ -15,6 +15,7 @@ import re
 import ssl
 import socket
 import uuid
+from random import choice
 
 from .numeric_replies import REPLY_CODES
 
@@ -353,7 +354,12 @@ class IRCBot(asynchat.async_chat):
         self.connect((self.servers[0], self.port))
         while self.running:
             self.schedule.execute()
-            asyncore.poll(timeout=1, map={self.socket: self})
+            try:
+                asyncore.poll(timeout=10, map={self.socket: self})
+            except socket.error as e:
+                log.error(e)
+                self.reconnect()
+                continue
             if set(self.channels) - set(self.connected_channels) and not self.connecting_to_channels:
                 self.schedule.queue_command(5, partial(self.join, self.channels))
 
