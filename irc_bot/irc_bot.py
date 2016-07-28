@@ -52,7 +52,7 @@ class QueuedCommand(object):
     def __eq__(self, other):
         commands_match = self.command.__name__ == other.command.__name__
         if hasattr(self.command, 'args') and hasattr(other.command, 'args'):
-            return commands_match and set(self.command.args) == set(other.command.args)
+            return commands_match and self.command.args == other.command.args
         else:
             return commands_match
 
@@ -163,6 +163,7 @@ class IRCBot(asynchat.async_chat):
             return
         elif error == errno.ETIMEDOUT:
             log.error('Connection timed out.')
+        log.error(error)
         self.handle_error()
 
     def _handshake(self):
@@ -200,6 +201,9 @@ class IRCBot(asynchat.async_chat):
         self.nick(self.real_nickname)
 
     def handle_error(self):
+        # Just ignore ssl read errors, they don't seem to matter
+        if sys.exc_info()[0] == ssl.SSLWantReadError:
+            return
         if not self.reconnecting:
             self.reconnecting = True
             delay = min(self.connection_attempts ** 2, self.max_connection_delay)
