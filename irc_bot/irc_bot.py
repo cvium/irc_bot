@@ -120,7 +120,7 @@ class IRCBot(asynchat.async_chat):
         asynchat.async_chat.__init__(self)
         self.servers = config['servers']
         self.port = config['port']
-        self.channels = config['channels']
+        self.channels = [c.lower() for c in config['channels']]
         self.nickname = config.get('nickname', 'Flexget-%s' % uuid.uuid4())
         self.invite_nickname = config.get('invite_nickname')
         self.invite_message = config.get('invite_message')
@@ -302,14 +302,14 @@ class IRCBot(asynchat.async_chat):
     def on_join(self, msg):
         if msg.from_nick == self.real_nickname:
             log.info('Joined channel %s', msg.arguments[0])
-            self.connected_channels.append(msg.arguments[0])
+            self.connected_channels.append(msg.arguments[0].lower())
         if not set(self.channels) - set(self.connected_channels):
             self.connecting_to_channels = False
 
     def on_kick(self, msg):
         if msg.arguments[1] == self.real_nickname:
             log.error('Kicked from channel %s by %s', msg.arguments[0], msg.from_nick)
-            self.connected_channels.remove(msg.arguments[0])
+            self.connected_channels.remove(msg.arguments[0].lower())
 
     def on_banned(self, msg):
         log.error('Banned from channel %s', msg.arguments[1])
