@@ -271,10 +271,10 @@ class IRCBot(asynchat.async_chat):
 
     def on_nicknotregistered(self, msg):
         log.error(msg.arguments[2])
-        self.quit()
 
     def on_inviteonly(self, msg):
-        self.schedule.queue_command(5, partial(self.join, self.channels))
+        log.error('Invite only channel %s', msg.arguments[1])
+        self.schedule.queue_command(10, partial(self.join, self.channels))
 
     def on_error(self, msg):
         log.error('Received error message from %s: %s', self.servers[0], msg.arguments[0])
@@ -327,6 +327,7 @@ class IRCBot(asynchat.async_chat):
 
     def on_nickinuse(self, msg):
         if self.real_nickname == msg.arguments[1]:
+            log.warning('Nickname %s is in use', self.real_nickname)
             self.real_nickname += '_'
             self.write('NICK %s' % self.real_nickname)
 
@@ -341,6 +342,7 @@ class IRCBot(asynchat.async_chat):
 
     def part(self, channels):
         if channels:
+            log.verbose('PARTing from channels: %s', ','.join(channels))
             self.write('PART %s' % ','.join(channels))
 
     def write(self, msg):
