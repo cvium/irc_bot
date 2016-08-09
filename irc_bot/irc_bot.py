@@ -78,6 +78,8 @@ class Schedule(object):
         queued_command = QueuedCommand(after, timestamp, cmd, persists)
         if not unique or queued_command not in self.queue:
             bisect.insort(self.queue, queued_command)
+        else:
+            log.warning('Failed to queue command "%s" because it\'s already queued.', cmd.__name__)
 
 
 def is_channel(string):
@@ -223,11 +225,12 @@ class IRCBot(asynchat.async_chat):
     def reconnect(self):
         try:
             self.reconnecting = False
+            self.connected_channels = []
             self.connection_attempts += 1
             self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
             # change server
             self.servers += [self.servers.pop(0)]
-            log.info('Connecting to %s', (self.servers[0], self.port))
+            log.info('Reconnecting to %s', (self.servers[0], self.port))
             self.connect((self.servers[0], self.port))
         except IOError as e:
             log.error(e)
