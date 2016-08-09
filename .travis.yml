@@ -2,7 +2,6 @@ language: python
 python:
 - '2.7'
 script:
-- if [ -n "$TRAVIS_TAG" ]; then exit 0; fi
 - touch foo
 deploy:
   provider: pypi
