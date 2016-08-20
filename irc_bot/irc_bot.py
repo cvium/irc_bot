@@ -65,8 +65,8 @@ class Schedule(object):
         for queued_cmd in self.queue:
             if datetime.datetime.now() >= queued_cmd.scheduled_time:
                 log.debug('Executing scheduled command %s', queued_cmd.command.__name__)
-                queued_cmd.command()
                 self.queue.pop(0)
+                queued_cmd.command()
                 if queued_cmd.persists:
                     self.queue_command(queued_cmd.after, queued_cmd.command, queued_cmd.persists)
             else:
