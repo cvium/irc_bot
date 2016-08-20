@@ -61,16 +61,18 @@ class Schedule(object):
     def __init__(self):
         self.queue = []
 
+    def peek(self):
+        if len(self.queue) > 0:
+            return self.queue[0].scheduled_time
+        return datetime.datetime.max
+
     def execute(self):
-        for queued_cmd in self.queue:
-            if datetime.datetime.now() >= queued_cmd.scheduled_time:
-                log.debug('Executing scheduled command %s', queued_cmd.command.__name__)
-                self.queue.pop(0)
-                queued_cmd.command()
-                if queued_cmd.persists:
-                    self.queue_command(queued_cmd.after, queued_cmd.command, queued_cmd.persists)
-            else:
-                break
+        while self.peek() <= datetime.datetime.now():
+            queued_command = self.queue.pop(0)
+            log.debug('Executing scheduled command %s', queued_command.command.__name__)
+            queued_command.command()
+            if queued_command.persists:
+                self.queue_command(queued_command.after, queued_command.command, queued_command.persists)
 
     def queue_command(self, after, cmd, persists=False, unique=True):
         log.debug('Queueing command "%s" to execute in %s second(s)', cmd.__name__, after)
