@@ -15,6 +15,7 @@ import re
 import ssl
 import socket
 import uuid
+import time
 
 from .numeric_replies import REPLY_CODES
 
@@ -362,6 +363,11 @@ class IRCBot(asynchat.async_chat):
         log.info('Connecting to %s', (self.servers[0], self.port))
         self.connect((self.servers[0], self.port))
         while self.running:
+            # No need to busy-wait
+            time.sleep(0.2)
+            # Skip all execution if we're reconnecting
+            if self.reconnecting:
+                continue
             self.schedule.execute()
             try:
                 asyncore.poll(timeout=10, map={self.socket: self})
