@@ -54,8 +54,7 @@ class QueuedCommand(object):
         commands_match = self.command.__name__ == other.command.__name__
         if hasattr(self.command, 'args') and hasattr(other.command, 'args'):
             return commands_match and self.command.args == other.command.args
-        else:
-            return commands_match
+        return commands_match
 
 
 class Schedule(object):
@@ -210,8 +209,9 @@ class IRCBot(asynchat.async_chat):
         if not self.reconnecting:
             self.reconnecting = True
             delay = min(self.connection_attempts ** 2, self.max_connection_delay)
-            log.error('Unknown error occurred. Attempting to restart connection in %s seconds.', delay)
-            self.schedule.queue_command(delay, partial(self.reconnect))
+            log.error('Unknown error occurred. Attempting to restart connection to %s in %s seconds.',
+                      (self.servers[0], self.port), delay, exc_info=True)
+            self.schedule.queue_command(delay, self.reconnect)
 
     def handle_close(self):
         # only handle close event if we're not actually just shutting down
