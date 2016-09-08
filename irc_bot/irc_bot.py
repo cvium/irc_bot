@@ -202,11 +202,13 @@ class IRCBot(asynchat.async_chat):
                 return
             finally:
                 self.socket.setblocking(False)
-
-        self.reconnecting = False
-        log.info('Connected to server %s', self.servers[0])
-        self.write('USER %s %s %s :%s' % (self.real_nickname, '8', '*', self.real_nickname))
-        self.nick(self.real_nickname)
+        # sometimes connection crashes but still causes a connect event. In that case reconnection has already
+        # been scheduled, so there's no need to pretend everything is ok.
+        if self.reconnecting:
+            self.reconnecting = False
+            log.info('Connected to server %s', self.servers[0])
+            self.write('USER %s %s %s :%s' % (self.real_nickname, '8', '*', self.real_nickname))
+            self.nick(self.real_nickname)
 
     def handle_error(self):
         # Just ignore ssl read errors, they don't seem to matter
