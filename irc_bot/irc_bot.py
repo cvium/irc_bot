@@ -61,6 +61,9 @@ class Schedule(object):
     def __init__(self):
         self.queue = []
 
+    def clear(self):
+        self.queue = []
+
     def peek(self):
         if len(self.queue) > 0:
             return self.queue[0].scheduled_time
@@ -214,6 +217,8 @@ class IRCBot(asynchat.async_chat):
             delay = min(self.connection_attempts ** 2, self.max_connection_delay)
             log.error('Unknown error occurred. Attempting to restart connection to %s in %s seconds.',
                       (self.servers[0], self.port), delay, exc_info=True)
+            # Clear the schedule since connection is dead
+            self.schedule.clear()
             self.schedule.queue_command(delay, self.reconnect)
 
     def handle_close(self):
@@ -372,10 +377,10 @@ class IRCBot(asynchat.async_chat):
         while self.running:
             # No need to busy-wait
             time.sleep(0.2)
-            # Skip all execution if we're reconnecting
+            self.schedule.execute()
+            # Skip polling etc. if we're reconnecting
             if self.reconnecting:
                 continue
-            self.schedule.execute()
             try:
                 asyncore.poll(timeout=10, map={self.socket: self})
             except socket.error as e:
