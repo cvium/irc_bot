@@ -279,8 +279,12 @@ class IRCBot(asynchat.async_chat):
         log.error(msg.arguments[2])
 
     def on_inviteonly(self, msg):
-        log.error('Invite only channel %s', msg.arguments[1])
-        self.schedule.queue_command(10, partial(self.join, self.channels))
+        if self.invite_nickname:
+            log.error('Invite only channel %s', msg.arguments[1])
+            self.schedule.queue_command(10, partial(self.join, self.channels))
+        else:
+            log.error('No invite nick specified. Cannot join invite-only channel %s', msg.arguments[1])
+            self.channels.remove(msg.arguments[1])
 
     def on_error(self, msg):
         log.error('Received error message from %s: %s', self.servers[0], msg.arguments[0])
