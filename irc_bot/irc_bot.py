@@ -197,7 +197,8 @@ class IRCBot(asynchat.async_chat):
                 log.error(e)
                 self.exit()
                 return
-            self.socket.setblocking(False)
+            finally:
+                self.socket.setblocking(False)
 
         self.reconnecting = False
         log.info('Connected to server %s', self.servers[0])
@@ -259,7 +260,7 @@ class IRCBot(asynchat.async_chat):
         try:
             data = data.decode('utf-8')
         except UnicodeDecodeError as e:
-            log.warning('%s. Will attempt to use latin-1 decoding instead.', e)
+            log.debug('%s. Will attempt to use latin-1 decoding instead.', e)
             data = data.decode('latin-1')
 
         self.buffer += strip_irc_colors(strip_invisible(data))
