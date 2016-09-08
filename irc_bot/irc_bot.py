@@ -204,7 +204,7 @@ class IRCBot(asynchat.async_chat):
                 self.socket.setblocking(False)
         # sometimes connection crashes but still causes a connect event. In that case reconnection has already
         # been scheduled, so there's no need to pretend everything is ok.
-        if self.reconnecting:
+        if not self.reconnecting:
             self.reconnecting = False
             log.info('Connected to server %s', self.servers[0])
             self.write('USER %s %s %s :%s' % (self.real_nickname, '8', '*', self.real_nickname))
