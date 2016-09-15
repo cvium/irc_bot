@@ -466,7 +466,7 @@ class IRCBot(asynchat.async_chat):
         Requests an invite from the configured invite user.
         :return:
         """
-        channels = list(self.channels.keys)
+        channels = list(self.channels.keys())
         log.info('Requesting an invite to channels %s from %s', channels, self.invite_nickname)
         self.send_privmsg(self.invite_nickname, self.invite_message)
         self.join(channels, delay=5)
