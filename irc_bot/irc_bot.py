@@ -434,6 +434,14 @@ class IRCBot(asynchat.async_chat):
             if dc_channels:
                 self.join(dc_channels, delay=5)
 
+    @property
+    def connected_channels(self):
+        res = []
+        for name, status in self.channels.items():
+            if status == IRCChannelStatus.CONNECTED:
+                res.append(name)
+        return res
+
     def disconnected_channels(self):
         res = []
         for name, status in self.channels.items():
