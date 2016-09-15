@@ -270,12 +270,18 @@ class IRCBot(asynchat.async_chat):
     def keepalive(self):
         self.write('PING %s' % self.servers[0])
 
-    def join(self, channels):
+    def join(self, channels, delay=None):
+        illegal_statuses = [IRCChannelStatus.CONNECTED, IRCChannelStatus.CONNECTING, IRCChannelStatus.IGNORE]
+        for channel in channels:
+            status = self.channels.get(channel.lower())
+            if status is not None and status not in illegal_statuses:
+                self.channels[channel.lower()] = None
+        if delay:
+            self.schedule.queue_command(delay, partial(self.join, channels))
+            return
         for channel in channels:
             channel = channel.lower()
-            if channel in self.channels and self.channels[channel] in [IRCChannelStatus.CONNECTED,
-                                                                       IRCChannelStatus.CONNECTING,
-                                                                       IRCChannelStatus.IGNORE]:
+            if channel in self.channels and self.channels[channel] in illegal_statuses:
                 continue
             log.info('Joining channel: %s', channel)
             self.write('JOIN %s' % channel)
@@ -312,7 +318,7 @@ class IRCBot(asynchat.async_chat):
     def on_inviteonly(self, msg):
         if self.invite_nickname:
             log.error('Invite only channel %s', msg.arguments[1])
-            self.schedule.queue_command(10, partial(self.join, [msg.arguments[1]]))
+            self.join([msg.arguments[1]], delay=10)
         else:
             log.error('No invite nick specified. Cannot join invite-only channel %s', msg.arguments[1])
             self.channels[msg.arguments[1].lower()] = IRCChannelStatus.IGNORE
@@ -350,7 +356,7 @@ class IRCBot(asynchat.async_chat):
     def on_join(self, msg):
         """Kind of an overloaded function in that it will leave channels it has been forced into without
         wanting to"""
-        channel = msg.arguments[0]
+        channel = msg.arguments[0].lower()
         if msg.from_nick == self.real_nickname:
             log.info('Joined channel %s', channel)
             if channel not in self.channels or self.channels[channel.lower()] == IRCChannelStatus.IGNORE:
@@ -426,7 +432,7 @@ class IRCBot(asynchat.async_chat):
                 continue
             dc_channels = self.disconnected_channels()
             if dc_channels:
-                self.schedule.queue_command(5, partial(self.join, dc_channels))
+                self.join(dc_channels, delay=5)
 
     def disconnected_channels(self):
         res = []
@@ -453,7 +459,7 @@ class IRCBot(asynchat.async_chat):
         if self.invite_nickname:
             self.schedule.queue_command(5, self.request_channel_invite)
         else:
-            self.schedule.queue_command(5, partial(self.join, list(self.channels.keys())))
+            self.join(list(self.channels.keys()), delay=5)
 
     def request_channel_invite(self):
         """
@@ -463,7 +469,7 @@ class IRCBot(asynchat.async_chat):
         channels = list(self.channels.keys)
         log.info('Requesting an invite to channels %s from %s', channels, self.invite_nickname)
         self.send_privmsg(self.invite_nickname, self.invite_message)
-        self.schedule.queue_command(5, partial(self.join, channels))
+        self.join(channels, delay=5)
 
     def add_event_handler(self, func, command=None, msg=None):
         if not isinstance(command, list):
