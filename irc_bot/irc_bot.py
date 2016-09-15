@@ -119,6 +119,15 @@ def strip_invisible(data):
     return stripped_data
 
 
+# Enum sort of
+class IRCChannelStatus(object):
+    IGNORE = -1
+    NOT_CONNECTED = 0
+    CONNECTING = 1
+    CONNECTED = 2
+    PARTING = 3
+
+
 class IRCBot(asynchat.async_chat):
     ac_in_buffer_size = 8192
     ac_out_buffer_size = 8192
@@ -127,14 +136,15 @@ class IRCBot(asynchat.async_chat):
         asynchat.async_chat.__init__(self)
         self.servers = config['servers']
         self.port = config['port']
-        self.channels = [c.lower() for c in config['channels']]
+        self.channels = {}
+        for channel in config['channels']:
+            self.add_irc_channel(channel)
         self.nickname = config.get('nickname', 'Flexget-%s' % uuid.uuid4())
         self.invite_nickname = config.get('invite_nickname')
         self.invite_message = config.get('invite_message')
         self.nickserv_password = config.get('nickserv_password')
         self.use_ssl = config.get('use_ssl', False)
 
-        self.connected_channels = []
         self.real_nickname = self.nickname
         self.set_terminator(b'\r\n')
         self.buffer = ''
@@ -143,7 +153,6 @@ class IRCBot(asynchat.async_chat):
         self.throttled = False
         self.schedule = Schedule()
         self.running = True
-        self.connecting_to_channels = True
         self.reconnecting = False
         self.event_handlers = {}
 
@@ -151,6 +160,7 @@ class IRCBot(asynchat.async_chat):
         self.add_event_handler(self.on_nicknotregistered, 'ERRNICKNOTREGISTERED')
         self.add_event_handler(self.on_inviteonly, 'ERRINVITEONLYCHAN')
         self.add_event_handler(self.on_error, 'ERROR')
+        self.add_event_handler(self.on_part, 'PART')
         self.add_event_handler(self.on_ping, 'PING')
         self.add_event_handler(self.on_invite, 'INVITE')
         self.add_event_handler(self.on_rplmotdend, ['RPLMOTDEND', 'ERRNOMOTD'])
@@ -161,6 +171,12 @@ class IRCBot(asynchat.async_chat):
         self.add_event_handler(self.on_welcome, 'RPLWELCOME')
         self.add_event_handler(self.on_nickinuse, 'ERRNICKNAMEINUSE')
         self.add_event_handler(self.on_nosuchnick, 'ERRNOSUCHNICK')
+
+    def add_irc_channel(self, name, status=None):
+        name = name.lower()
+        if name in self.channels:
+            return
+        self.channels[name] = status
 
     def handle_expt_event(self):
         error = self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
@@ -236,7 +252,7 @@ class IRCBot(asynchat.async_chat):
     def reconnect(self):
         try:
             self.reconnecting = False
-            self.connected_channels = []
+            self.reset_channels()
             self.connection_attempts += 1
             self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
             # change server
@@ -247,12 +263,19 @@ class IRCBot(asynchat.async_chat):
             log.error(e)
             self.handle_error()
 
+    def reset_channels(self):
+        for channel in self.channels.keys():
+            self.channels[channel] = IRCChannelStatus.NOT_CONNECTED
+
     def keepalive(self):
         self.write('PING %s' % self.servers[0])
 
     def join(self, channels):
         for channel in channels:
-            if channel in self.connected_channels:
+            channel = channel.lower()
+            if channel in self.channels and self.channels[channel] in [IRCChannelStatus.CONNECTED,
+                                                                       IRCChannelStatus.CONNECTING,
+                                                                       IRCChannelStatus.IGNORE]:
                 continue
             log.info('Joining channel: %s', channel)
             self.write('JOIN %s' % channel)
@@ -289,21 +312,28 @@ class IRCBot(asynchat.async_chat):
     def on_inviteonly(self, msg):
         if self.invite_nickname:
             log.error('Invite only channel %s', msg.arguments[1])
-            self.schedule.queue_command(10, partial(self.join, self.channels))
+            self.schedule.queue_command(10, partial(self.join, [msg.arguments[1]]))
         else:
             log.error('No invite nick specified. Cannot join invite-only channel %s', msg.arguments[1])
-            self.channels.remove(msg.arguments[1])
+            self.channels[msg.arguments[1].lower()] = IRCChannelStatus.IGNORE
 
     def on_error(self, msg):
         log.error('Received error message from %s: %s', self.servers[0], msg.arguments[0])
         if 'throttled' in msg.raw or 'throttling' in msg.raw:
             self.throttled = True
 
+    def on_part(self, msg):
+        """This function assumes we parted on purpose, so it sets the channel status to ignore"""
+        channel = msg.arguments[0]
+        log.info('Left channel %s', channel)
+        if channel in self.channels.keys():
+            self.channels[channel] = IRCChannelStatus.IGNORE
+
     def on_ping(self, msg):
         self.write('PONG :%s' % msg.arguments[0])
 
     def on_invite(self, msg):
-        if self.nickname == msg.arguments[0] and msg.arguments[1] in self.channels:
+        if self.nickname == msg.arguments[0] and msg.arguments[1].lower() in self.channels:
             self.join([msg.arguments[1]])
 
     def on_rplmotdend(self, msg):
@@ -318,21 +348,26 @@ class IRCBot(asynchat.async_chat):
         raise NotImplementedError()
 
     def on_join(self, msg):
+        """Kind of an overloaded function in that it will leave channels it has been forced into without
+        wanting to"""
+        channel = msg.arguments[0]
         if msg.from_nick == self.real_nickname:
-            log.info('Joined channel %s', msg.arguments[0])
-            self.connected_channels.append(msg.arguments[0].lower())
-        if not set(self.channels) - set(self.connected_channels):
-            self.connecting_to_channels = False
+            log.info('Joined channel %s', channel)
+            if channel not in self.channels or self.channels[channel.lower()] == IRCChannelStatus.IGNORE:
+                self.part([channel])
+                return
+            self.channels[msg.arguments[0].lower()] = IRCChannelStatus.CONNECTED
 
     def on_kick(self, msg):
         if msg.arguments[1] == self.real_nickname:
-            log.error('Kicked from channel %s by %s', msg.arguments[0], msg.from_nick)
-            self.connected_channels.remove(msg.arguments[0].lower())
+            channel = msg.arguments[0]
+            log.error('Kicked from channel %s by %s', channel, msg.from_nick)
+            self.channels[channel.lower()] = IRCChannelStatus.NOT_CONNECTED
 
     def on_banned(self, msg):
         log.error('Banned from channel %s', msg.arguments[1])
         try:
-            self.channels.remove(msg.arguments[1])
+            self.channels[msg.arguments[1].lower()] = IRCChannelStatus.IGNORE
         except ValueError:
             pass
 
@@ -389,11 +424,16 @@ class IRCBot(asynchat.async_chat):
                 log.error(e)
                 self.reconnect()
                 continue
-            if set(self.channels) - set(self.connected_channels) and not self.connecting_to_channels:
-                self.schedule.queue_command(5, partial(self.join, self.channels))
+            dc_channels = self.disconnected_channels()
+            if dc_channels:
+                self.schedule.queue_command(5, partial(self.join, dc_channels))
 
-            # disconnect from unwanted channels
-            self.part(list(set(self.connected_channels) - set(self.channels)))
+    def disconnected_channels(self):
+        res = []
+        for name, status in self.channels.items():
+            if status == IRCChannelStatus.NOT_CONNECTED:
+                res.append(name)
+        return res
 
     def identify_with_nickserv(self):
         """
@@ -413,16 +453,17 @@ class IRCBot(asynchat.async_chat):
         if self.invite_nickname:
             self.schedule.queue_command(5, self.request_channel_invite)
         else:
-            self.schedule.queue_command(5, partial(self.join, self.channels))
+            self.schedule.queue_command(5, partial(self.join, list(self.channels.keys())))
 
     def request_channel_invite(self):
         """
         Requests an invite from the configured invite user.
         :return:
         """
-        log.info('Requesting an invite to channels %s from %s', self.channels, self.invite_nickname)
+        channels = list(self.channels.keys)
+        log.info('Requesting an invite to channels %s from %s', channels, self.invite_nickname)
         self.send_privmsg(self.invite_nickname, self.invite_message)
-        self.schedule.queue_command(5, partial(self.join, self.channels))
+        self.schedule.queue_command(5, partial(self.join, channels))
 
     def add_event_handler(self, func, command=None, msg=None):
         if not isinstance(command, list):
