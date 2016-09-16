@@ -236,7 +236,7 @@ class IRCBot(asynchat.async_chat):
             self.reconnecting = True
             delay = min(self.connection_attempts ** 2, self.max_connection_delay)
             log.error('Unknown error occurred. Attempting to restart connection to %s in %s seconds.',
-                      (self.servers[0], self.port), delay, exc_info=True)
+                      self.current_server, delay, exc_info=True)
             # Clear the schedule since connection is dead
             self.schedule.clear()
             self.schedule.queue_command(delay, self.reconnect)
@@ -259,8 +259,8 @@ class IRCBot(asynchat.async_chat):
             self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
             # change server
             self.servers += [self.servers.pop(0)]
-            log.info('Reconnecting to %s', (self.servers[0], self.port))
-            self.connect((self.servers[0], self.port))
+            log.info('Reconnecting to %s', self.current_server)
+            self.connect(self.current_server)
         except IOError as e:
             log.error(e)
             self.handle_error()
@@ -415,17 +415,21 @@ class IRCBot(asynchat.async_chat):
         self.write('QUIT :I\'m outta here!')
         self.exit()
 
+    @property
+    def current_server(self):
+        return (self.servers[0], self.port)
+
     def start(self):
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        log.info('Connecting to %s', (self.servers[0], self.port))
-        self.connect((self.servers[0], self.port))
+        log.info('Connecting to %s', self.current_server)
+        self.connect(self.current_server)
         while self.running:
             # No need to busy-wait
             time.sleep(0.2)
             self.schedule.execute()
             # Skip polling etc. if we're reconnecting
             if self.timeout >= 30:
-                log.error('Establishing a connection failed after 30 seconds.')
+                log.error('Establishing a connection to %s failed after 30 seconds.', self.current_server)
                 self.timeout = 0
                 self.reconnect()
                 continue
