@@ -144,6 +144,7 @@ class IRCBot(asynchat.async_chat):
         self.invite_message = config.get('invite_message')
         self.nickserv_password = config.get('nickserv_password')
         self.use_ssl = config.get('use_ssl', False)
+        self.timeout = 0
 
         self.real_nickname = self.nickname
         self.set_terminator(b'\r\n')
@@ -222,6 +223,7 @@ class IRCBot(asynchat.async_chat):
         # been scheduled, so there's no need to pretend everything is ok.
         if not self.reconnecting:
             self.reconnecting = False
+            self.timeout = 0
             log.info('Connected to server %s', self.servers[0])
             self.write('USER %s %s %s :%s' % (self.real_nickname, '8', '*', self.real_nickname))
             self.nick(self.real_nickname)
@@ -422,7 +424,12 @@ class IRCBot(asynchat.async_chat):
             time.sleep(0.2)
             self.schedule.execute()
             # Skip polling etc. if we're reconnecting
+            if self.timeout >= 30:
+                log.error('Establishing a connection failed after 30 seconds.')
+                self.reconnect()
+                continue
             if self.reconnecting or not self.connected:
+                self.timeout += 0.2
                 continue
             try:
                 asyncore.poll(timeout=10, map={self.socket: self})
