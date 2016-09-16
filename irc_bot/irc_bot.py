@@ -422,7 +422,7 @@ class IRCBot(asynchat.async_chat):
             time.sleep(0.2)
             self.schedule.execute()
             # Skip polling etc. if we're reconnecting
-            if self.reconnecting:
+            if self.reconnecting or not self.connected:
                 continue
             try:
                 asyncore.poll(timeout=10, map={self.socket: self})
