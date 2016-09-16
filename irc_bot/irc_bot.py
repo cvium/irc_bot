@@ -426,6 +426,7 @@ class IRCBot(asynchat.async_chat):
             # Skip polling etc. if we're reconnecting
             if self.timeout >= 30:
                 log.error('Establishing a connection failed after 30 seconds.')
+                self.timeout = 0
                 self.reconnect()
                 continue
             if self.reconnecting or not self.connected:
