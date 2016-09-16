@@ -206,23 +206,9 @@ class IRCBot(asynchat.async_chat):
                 break
 
     def handle_connect(self):
-        if self.use_ssl:
-            try:
-                self.socket.setblocking(True)
-                self.socket = ssl.wrap_socket(self.socket)
-            except (ssl.SSLWantReadError, ssl.SSLWantWriteError) as e:
-                log.debug(e)
-                self._handshake()
-            except ssl.SSLError as e:
-                log.error(e)
-                self.exit()
-                return
-            finally:
-                self.socket.setblocking(False)
         # sometimes connection crashes but still causes a connect event. In that case reconnection has already
         # been scheduled, so there's no need to pretend everything is ok.
         if not self.reconnecting:
-            self.reconnecting = False
             self.timeout = 0
             log.info('Connected to server %s', self.servers[0])
             self.write('USER %s %s %s :%s' % (self.real_nickname, '8', '*', self.real_nickname))
@@ -259,10 +245,8 @@ class IRCBot(asynchat.async_chat):
             self.reconnecting = False
             self.reset_channels()
             self.connection_attempts += 1
-            self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
             # change server
             self.servers += [self.servers.pop(0)]
-            log.info('Reconnecting to %s', self.current_server)
             self.connect(self.current_server)
         except IOError as e:
             log.error(e)
@@ -422,9 +406,29 @@ class IRCBot(asynchat.async_chat):
     def current_server(self):
         return (self.servers[0], self.port)
 
-    def start(self):
+    def connect(self, server):
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        if self.use_ssl:
+            try:
+                self.socket.setblocking(True)
+                self.socket = ssl.wrap_socket(self.socket)
+            except (ssl.SSLWantReadError, ssl.SSLWantWriteError) as e:
+                log.debug(e)
+                self._handshake()
+            except ssl.SSLError as e:
+                log.error(e)
+                self.exit()
+                return
+            finally:
+                self.socket.setblocking(False)
+
         log.info('Connecting to %s', self.current_server)
+        self.socket.setblocking(True)
+        self.socket.connect(server)
+        self.socket.setblocking(False)
+        self.handle_connect_event()
+
+    def start(self):
         self.connect(self.current_server)
         while self.running:
             # No need to busy-wait
