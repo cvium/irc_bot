@@ -233,13 +233,16 @@ class IRCBot(asynchat.async_chat):
         if sys.exc_info()[0] == ssl.SSLWantReadError:
             return
         if not self.reconnecting:
-            self.reconnecting = True
-            delay = min(self.connection_attempts ** 2, self.max_connection_delay)
-            log.error('Unknown error occurred. Attempting to restart connection to %s in %s seconds.',
-                      self.current_server, delay, exc_info=True)
-            # Clear the schedule since connection is dead
-            self.schedule.clear()
-            self.schedule.queue_command(delay, self.reconnect)
+            log.error('Unknown error occurred.', exc_info=True)
+            self.reconnect_with_delay()
+
+    def reconnect_with_delay(self):
+        self.reconnecting = True
+        delay = min(self.connection_attempts ** 2, self.max_connection_delay)
+        log.info('Attempting to restart connection to %s in %s seconds.', self.current_server, delay)
+        # Clear the schedule since connection is dead
+        self.schedule.clear()
+        self.schedule.queue_command(delay, self.reconnect)
 
     def handle_close(self):
         # only handle close event if we're not actually just shutting down
@@ -431,7 +434,7 @@ class IRCBot(asynchat.async_chat):
             if self.timeout >= 30:
                 log.error('Establishing a connection to %s failed after 30 seconds.', self.current_server)
                 self.timeout = 0
-                self.reconnect()
+                self.reconnect_with_delay()
                 continue
             if self.reconnecting or not self.connected:
                 self.timeout += 0.2
@@ -440,7 +443,7 @@ class IRCBot(asynchat.async_chat):
                 asyncore.poll(timeout=10, map={self.socket: self})
             except socket.error as e:
                 log.error(e)
-                self.reconnect()
+                self.reconnect_with_delay()
                 continue
             dc_channels = self.disconnected_channels()
             if dc_channels:
