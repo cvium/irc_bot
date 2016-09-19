@@ -319,10 +319,12 @@ class IRCBot(asynchat.async_chat):
 
     def on_part(self, msg):
         """This function assumes we parted on purpose, so it sets the channel status to ignore"""
-        channel = msg.arguments[0]
-        log.info('Left channel %s', channel)
-        if channel in self.channels.keys():
-            self.channels[channel] = IRCChannelStatus.IGNORE
+        # Others leaving doesn't mean we did
+        if msg.from_nick == self.real_nickname:
+            channel = msg.arguments[0]
+            log.info('Left channel %s', channel)
+            if channel in self.channels.keys():
+                self.channels[channel] = IRCChannelStatus.IGNORE
 
     def on_ping(self, msg):
         self.write('PONG :%s' % msg.arguments[0])
