@@ -241,6 +241,7 @@ class IRCBot(asynchat.async_chat):
         self.close()
 
     def reconnect(self):
+        """Reconnects to the server"""
         try:
             self.reconnecting = False
             self.reset_channels()
@@ -253,13 +254,18 @@ class IRCBot(asynchat.async_chat):
             self.handle_error()
 
     def reset_channels(self):
+        """Sets the status to channels as NOT CONNECTED."""
         for channel in self.channels.keys():
             self.channels[channel] = IRCChannelStatus.NOT_CONNECTED
 
     def keepalive(self):
+        """Used to send pings continually to the server to avoid timeouts"""
         self.write('PING %s' % self.servers[0])
 
     def join(self, channels, delay=None):
+        """Joins the specified channel(s) with an optional delay.
+        Will not join channel if status is CONNECTED, CONNECTING or IGNORE.
+        Also resets the channel flag to None to indicate it has no status."""
         illegal_statuses = [IRCChannelStatus.CONNECTED, IRCChannelStatus.CONNECTING, IRCChannelStatus.IGNORE]
         for channel in channels:
             status = self.channels.get(channel.lower())
@@ -302,9 +308,13 @@ class IRCBot(asynchat.async_chat):
             self.handle_event(line)
 
     def on_nicknotregistered(self, msg):
+        """Simply logs the error message. Could also register with the specified password, but needs an email
+        as well."""
         log.error(msg.arguments[2])
 
     def on_inviteonly(self, msg):
+        """Try to join invite only channel if there is specified an invite nickname ie. a nickname that is capable
+        of inviting the bot. Otherwise set the IGNORE flag on the channel."""
         if self.invite_nickname:
             log.error('Invite only channel %s', msg.arguments[1])
             self.join([msg.arguments[1]], delay=10)
@@ -313,6 +323,8 @@ class IRCBot(asynchat.async_chat):
             self.channels[msg.arguments[1].lower()] = IRCChannelStatus.IGNORE
 
     def on_error(self, msg):
+        """This method simply logs the error message received from the server and sets throttled flag if message
+        contains 'throttled/throttling'"""
         log.error('Received error message from %s: %s', self.servers[0], msg.arguments[0])
         if 'throttled' in msg.raw or 'throttling' in msg.raw:
             self.throttled = True
@@ -327,17 +339,21 @@ class IRCBot(asynchat.async_chat):
                 self.channels[channel] = IRCChannelStatus.IGNORE
 
     def on_ping(self, msg):
+        """Sends back a proper PONG message when receiving a PING"""
         self.write('PONG :%s' % msg.arguments[0])
 
     def on_invite(self, msg):
+        """Joins the channel after receiving an invite"""
         if self.nickname == msg.arguments[0] and msg.arguments[1].lower() in self.channels:
             self.join([msg.arguments[1]])
 
     def on_rplmotdend(self, msg):
+        """This bot defines receiving MOTD end message as being fully connected"""
         log.debug('Successfully connected to %s', self.servers[0])
         self.identify_with_nickserv()
 
     def on_privmsg(self, msg):
+        """This method should be overridden by subclass"""
         if is_channel(msg.arguments[0]):
             log.debug('Public message in channel %s received', msg.arguments[0])
         else:
@@ -356,12 +372,14 @@ class IRCBot(asynchat.async_chat):
             self.channels[msg.arguments[0].lower()] = IRCChannelStatus.CONNECTED
 
     def on_kick(self, msg):
+        """Merely sets the flag to NOT CONNECTED for the channel"""
         if msg.arguments[1] == self.real_nickname:
             channel = msg.arguments[0]
             log.error('Kicked from channel %s by %s', channel, msg.from_nick)
             self.channels[channel.lower()] = IRCChannelStatus.NOT_CONNECTED
 
     def on_banned(self, msg):
+        """Sets the ignore flag on the banned channel"""
         log.error('Banned from channel %s', msg.arguments[1])
         try:
             self.channels[msg.arguments[1].lower()] = IRCChannelStatus.IGNORE
@@ -369,6 +387,7 @@ class IRCBot(asynchat.async_chat):
             pass
 
     def on_welcome(self, msg):
+        """Schedules keepalive and saves the nickname received from server"""
         # Save the nick from server as it may have changed it
         self.real_nickname = msg.arguments[0]
         self.throttled = False
@@ -376,26 +395,32 @@ class IRCBot(asynchat.async_chat):
         self.schedule.queue_command(2 * 60, self.keepalive, persists=True)
 
     def on_nickinuse(self, msg):
+        """Appends an underscore to the nickname"""
         if self.real_nickname == msg.arguments[1]:
             log.warning('Nickname %s is in use', self.real_nickname)
             self.real_nickname += '_'
             self.write('NICK %s' % self.real_nickname)
 
     def on_nosuchnick(self, msg):
+        """Logs the error. Should not happen."""
         log.error('%s: %s', msg.arguments[2], msg.arguments[1])
 
     def send_privmsg(self, to, msg):
+        """Sends a PRIVMSG"""
         self.write('PRIVMSG %s :%s' % (to, msg))
 
     def nick(self, nickname):
+        """Sets the nickname for the bot"""
         self.write('NICK %s' % nickname)
 
     def part(self, channels):
+        """PARTs from the channel(s)"""
         if channels:
             log.verbose('PARTing from channels: %s', ','.join(channels))
             self.write('PART %s' % ','.join(channels))
 
     def write(self, msg):
+        """Appends a newline to the message and encodes it to bytes before sending"""
         log.debug('SENT: %s', msg)
         unencoded_msg = msg + '\r\n'
         self.send(unencoded_msg.encode())
@@ -409,6 +434,7 @@ class IRCBot(asynchat.async_chat):
         return (self.servers[0], self.port)
 
     def connect(self, server):
+        """Creates a (ssl) socket and connects to the server. Not using asyncore's connect-function because it sucks."""
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         if self.use_ssl:
             try:
@@ -431,6 +457,7 @@ class IRCBot(asynchat.async_chat):
         self.handle_connect_event()
 
     def start(self):
+        """The main loop keeping the bot alive"""
         self.connect(self.current_server)
         while self.running:
             # No need to busy-wait
@@ -457,6 +484,7 @@ class IRCBot(asynchat.async_chat):
 
     @property
     def connected_channels(self):
+        """Returns a list of channels with status CONNECTED"""
         res = []
         for name, status in self.channels.items():
             if status == IRCChannelStatus.CONNECTED:
@@ -464,6 +492,7 @@ class IRCBot(asynchat.async_chat):
         return res
 
     def disconnected_channels(self):
+        """Returns a list of channels with status NOT CONNECTED"""
         res = []
         for name, status in self.channels.items():
             if status == IRCChannelStatus.NOT_CONNECTED:
@@ -473,6 +502,7 @@ class IRCBot(asynchat.async_chat):
     def identify_with_nickserv(self):
         """
         Identifies the connection with Nickserv, ghosting to recover the nickname if required
+
         :return:
         """
         if self.nickserv_password:
