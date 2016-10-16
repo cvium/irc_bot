@@ -19,6 +19,8 @@ import time
 
 from .numeric_replies import REPLY_CODES
 
+from six.moves.html_parser import HTMLParser
+
 log = logging.getLogger('irc_bot')
 
 
@@ -117,6 +119,12 @@ def strip_invisible(data):
         i += 1
         stripped_data += c
     return stripped_data
+
+
+def decode_html(data):
+    """Decode dumb html"""
+    h = HTMLParser()
+    return h.unescape(data)
 
 
 # Enum sort of
@@ -294,7 +302,7 @@ class IRCBot(asynchat.async_chat):
             log.debug('%s. Will attempt to use latin-1 decoding instead.', e)
             data = data.decode('latin-1')
 
-        self.buffer += strip_irc_colors(strip_invisible(data))
+        self.buffer += decode_html(strip_irc_colors(strip_invisible(data)))
 
     def _process_message(self, msg):
         messages = []
