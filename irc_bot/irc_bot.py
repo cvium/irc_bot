@@ -12,8 +12,9 @@ import functools
 import hashlib
 import logging
 import re
-import ssl
 import socket
+import ssl
+import sys
 import uuid
 import time
 
