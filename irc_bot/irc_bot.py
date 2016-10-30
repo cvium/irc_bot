@@ -136,6 +136,16 @@ class IRCChannelStatus(object):
     CONNECTED = 2
     PARTING = 3
 
+    @property
+    def enum_dict(self):
+        return {
+            -1: 'IGNORE',
+            0: 'NOT_CONNECTED',
+            1: 'CONNECTING',
+            2: 'CONNECTED',
+            3: 'PARTING'
+        }
+
 
 class IRCBot(asynchat.async_chat):
     ac_in_buffer_size = 8192
