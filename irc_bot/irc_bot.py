@@ -257,6 +257,7 @@ class IRCBot(asynchat.async_chat):
     def exit(self):
         log.info('Shutting down connection to %s:%s', self.servers[0], self.port)
         self.running = False
+        self.reset_channels()
         self.close()
 
     def reconnect(self):
