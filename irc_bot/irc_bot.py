@@ -276,7 +276,7 @@ class IRCBot(asynchat.async_chat):
     def reset_channels(self):
         """Sets the status to channels as NOT CONNECTED."""
         for channel in self.channels.keys():
-            self.channels[channel] = IRCChannelStatus.NOT_CONNECTED
+            self.channels[channel] = None
 
     def keepalive(self):
         """Used to send pings continually to the server to avoid timeouts"""
@@ -455,6 +455,11 @@ class IRCBot(asynchat.async_chat):
 
     def connect(self, server):
         """Creates a (ssl) socket and connects to the server. Not using asyncore's connect-function because it sucks."""
+        # sockets are garbage collected, but if the connection isn't closed it might fail
+        try:
+            self.socket.close()
+        except Exception:
+            pass
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         if self.use_ssl:
             try:
@@ -471,9 +476,8 @@ class IRCBot(asynchat.async_chat):
                 self.socket.setblocking(False)
 
         log.info('Connecting to %s', self.current_server)
-        self.socket.setblocking(True)
+        self.socket.settimeout(30)
         self.socket.connect(server)
-        self.socket.setblocking(False)
         self.handle_connect_event()
 
     def start(self):
@@ -484,13 +488,7 @@ class IRCBot(asynchat.async_chat):
             time.sleep(0.2)
             self.schedule.execute()
             # Skip polling etc. if we're reconnecting
-            if self.timeout >= 30:
-                log.error('Establishing a connection to %s failed after 30 seconds.', self.current_server)
-                self.timeout = 0
-                self.reconnect_with_delay()
-                continue
-            if self.reconnecting or not self.connected:
-                self.timeout += 0.2
+            if self.reconnecting and not self.connected:
                 continue
             try:
                 asyncore.poll(timeout=10, map={self.socket: self})
