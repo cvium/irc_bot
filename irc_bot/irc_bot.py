@@ -163,6 +163,7 @@ class IRCBot(asynchat.async_chat):
         self.invite_message = config.get('invite_message')
         self.nickserv_password = config.get('nickserv_password')
         self.use_ssl = config.get('use_ssl', False)
+        self.password = config.get('password')
         self.timeout = 0
 
         self.real_nickname = self.nickname
@@ -230,6 +231,8 @@ class IRCBot(asynchat.async_chat):
         if not self.reconnecting:
             self.timeout = 0
             log.info('Connected to server %s', self.servers[0])
+            if self.password:
+                self.write('PASS %s' % self.password)
             self.write('USER %s %s %s :%s' % (self.real_nickname, '8', '*', self.real_nickname))
             self.nick(self.real_nickname)
 
