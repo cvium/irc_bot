@@ -163,7 +163,7 @@ class IRCBot(asynchat.async_chat):
         self.invite_message = config.get('invite_message')
         self.nickserv_password = config.get('nickserv_password')
         self.use_ssl = config.get('use_ssl', False)
-        self.password = config.get('password', None)
+        self.password = config.get('password')
         self.timeout = 0
 
         self.real_nickname = self.nickname
