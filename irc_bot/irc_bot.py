@@ -340,7 +340,7 @@ class IRCBot(asynchat.async_chat):
         of inviting the bot. Otherwise set the IGNORE flag on the channel."""
         if self.invite_nickname:
             log.error('Invite only channel %s', msg.arguments[1])
-            self.join([msg.arguments[1]], delay=10)
+            self.request_channel_invite()
         else:
             log.error('No invite nick specified. Cannot join invite-only channel %s', msg.arguments[1])
             self.channels[msg.arguments[1].lower()] = IRCChannelStatus.IGNORE
