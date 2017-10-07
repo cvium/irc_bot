@@ -64,7 +64,7 @@ class SimpleIRCBot(asynchat.async_chat):
         self.channels = {}
         for channel in config['channels']:
             self.add_irc_channel(channel)
-        self.nickname = config.get('nickname', 'Flexget-%s' % uuid.uuid4())
+        self.nickname = config.get('nickname', 'SimpleIRCBot-%s' % uuid.uuid4())
         self.invite_nickname = config.get('invite_nickname')
         self.invite_message = config.get('invite_message')
         self.nickserv_password = config.get('nickserv_password')
@@ -459,7 +459,7 @@ class SimpleIRCBot(asynchat.async_chat):
         self.send_privmsg(self.invite_nickname, self.invite_message)
         self.join(channels, delay=5)
 
-    def add_event_handler(self, func, command=None):
+    def add_event_handler(self, func, commands=None):
         """
 
         :param func: Event handler function
@@ -467,12 +467,12 @@ class SimpleIRCBot(asynchat.async_chat):
         :type func: function
         :return:
         """
-        if not isinstance(command, list):
-            command = [command] if command else []
+        if not isinstance(commands, list):
+            commands = [commands] if commands else []
 
-        log.debug('Adding event handler %s for command=%s', func.__name__, command)
-        hash = hashlib.md5('.'.join(sorted(command)).encode('utf-8'))
-        self.event_handlers[hash] = EventHandler(func, command)
+        log.debug('Adding event handler %s for commands=%s', func.__name__, commands)
+        hash = hashlib.md5('.'.join(sorted(commands)).encode('utf-8'))
+        self.event_handlers[hash] = EventHandler(func, commands)
 
     def handle_event(self, msg):
         """Call the proper function that has been set to handle the input message type eg. RPLMOTD"""
