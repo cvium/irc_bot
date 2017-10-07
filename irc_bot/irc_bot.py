@@ -14,7 +14,7 @@ import uuid
 
 from builtins import *  # pylint: disable=unused-import, redefined-builtin
 
-from irc_bot.command_scheduler import Schedule
+from irc_bot.command_scheduler import CommandScheduler
 from irc_bot.irc_message import IRCMessage
 from irc_bot.utils import printable_unicode_list, is_channel, strip_irc_colors, strip_invisible, decode_html
 
@@ -78,7 +78,7 @@ class IRCBot(asynchat.async_chat):
         self.connection_attempts = 1
         self.max_connection_delay = 300  # 5 minutes
         self.throttled = False
-        self.schedule = Schedule()
+        self.schedule = CommandScheduler()
         self.running = True
         self.reconnecting = False
         self.event_handlers = {}

@@ -4,7 +4,7 @@ import datetime
 from irc_bot.irc_bot import log
 
 
-class Schedule(object):
+class CommandScheduler(object):
     def __init__(self):
         self.queue = []
 
