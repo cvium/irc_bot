@@ -1,7 +1,7 @@
 import bisect
 import datetime
 
-from irc_bot.irc_bot import log
+from .irc_bot import log
 
 
 class CommandScheduler(object):

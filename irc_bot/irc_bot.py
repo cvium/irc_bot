@@ -14,9 +14,9 @@ import uuid
 
 from builtins import *  # pylint: disable=unused-import, redefined-builtin
 
-from irc_bot.command_scheduler import CommandScheduler
-from irc_bot.irc_message import IRCMessage
-from irc_bot.utils import printable_unicode_list, is_channel, strip_irc_colors, strip_invisible, decode_html
+from .command_scheduler import CommandScheduler
+from .irc_message import IRCMessage
+from .utils import printable_unicode_list, is_channel, strip_irc_colors, strip_invisible, decode_html
 
 log = logging.getLogger('irc_bot')
 
