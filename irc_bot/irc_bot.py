@@ -366,7 +366,9 @@ class IRCBot(asynchat.async_chat):
         """Creates a (ssl) socket and connects to the server. Not using asyncore's connect-function because it sucks."""
         # sockets are garbage collected, but if the connection isn't closed it might fail
         try:
+            self.socket.shutdown(socket.SHUT_WR)
             self.socket.close()
+            del self.socket
         except Exception:
             pass
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)

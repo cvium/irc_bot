@@ -1,5 +1,7 @@
 import re
 
+from six.moves.html_parser import HTMLParser
+
 
 def printable_unicode_list(unicode_list):
     return '[{}]'.format(', '.join(str(x) for x in unicode_list))
