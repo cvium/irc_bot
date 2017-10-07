@@ -1,12 +1,7 @@
 from __future__ import unicode_literals, division, absolute_import
-from builtins import *  # pylint: disable=unused-import, redefined-builtin
-from future.utils import python_2_unicode_compatible
-# -*- coding: utf-8 -*-
 
 import asynchat
 import asyncore
-import bisect
-import datetime
 import errno
 import functools
 import hashlib
@@ -14,13 +9,14 @@ import logging
 import re
 import socket
 import ssl
-import sys
-import uuid
 import time
+import uuid
 
-from .numeric_replies import REPLY_CODES
+from builtins import *  # pylint: disable=unused-import, redefined-builtin
 
-from six.moves.html_parser import HTMLParser
+from irc_bot.command_scheduler import Schedule
+from irc_bot.irc_message import IRCMessage
+from irc_bot.utils import printable_unicode_list, is_channel, strip_irc_colors, strip_invisible, decode_html
 
 log = logging.getLogger('irc_bot')
 
@@ -33,99 +29,9 @@ def partial(func, *args, **kwargs):
 
 
 class EventHandler(object):
-    def __init__(self, func, command=None, msg=None):
+    def __init__(self, func, command=None):
         self.func = func
         self.command = command
-        self.msg = msg
-
-
-def printable_unicode_list(unicode_list):
-    return '[{}]'.format(', '.join(str(x) for x in unicode_list))
-
-
-class QueuedCommand(object):
-    def __init__(self, after, scheduled_time, command, persists=False):
-        self.after = after
-        self.scheduled_time = scheduled_time
-        self.command = command
-        self.persists = persists
-
-    def __lt__(self, other):
-        return self.scheduled_time < other.scheduled_time
-
-    def __eq__(self, other):
-        commands_match = self.command.__name__ == other.command.__name__
-        if hasattr(self.command, 'args') and hasattr(other.command, 'args'):
-            return commands_match and self.command.args == other.command.args
-        return commands_match
-
-
-class Schedule(object):
-    def __init__(self):
-        self.queue = []
-
-    def clear(self):
-        self.queue = []
-
-    def peek(self):
-        if len(self.queue) > 0:
-            return self.queue[0].scheduled_time
-        return datetime.datetime.max
-
-    def execute(self):
-        while self.peek() <= datetime.datetime.now():
-            queued_command = self.queue.pop(0)
-            log.debug('Executing scheduled command %s', queued_command.command.__name__)
-            queued_command.command()
-            if queued_command.persists:
-                self.queue_command(queued_command.after, queued_command.command, queued_command.persists)
-
-    def queue_command(self, after, cmd, persists=False, unique=True):
-        log.debug('Queueing command "%s" to execute in %s second(s)', cmd.__name__, after)
-        timestamp = datetime.datetime.now() + datetime.timedelta(seconds=after)
-        queued_command = QueuedCommand(after, timestamp, cmd, persists)
-        if not unique or queued_command not in self.queue:
-            bisect.insort(self.queue, queued_command)
-        else:
-            log.warning('Failed to queue command "%s" because it\'s already queued.', cmd.__name__)
-
-
-def is_channel(string):
-    """
-    Return True if input string is a channel
-    """
-    return string and string[0] in "#&+!"
-
-
-def strip_irc_colors(data):
-    """Strip mirc colors from string. Expects data to be decoded."""
-    return re.sub('[\x02\x0F\x16\x1D\x1F]|\x03(\d{1,2}(,\d{1,2})?)?', '', data)
-
-
-def strip_invisible(data):
-    """Strip stupid characters that have been colored 'invisible'. Assumes data has been decoded"""
-    stripped_data = ''
-    i = 0
-    while i < len(data):
-        c = data[i]
-        if c == '\x03':
-            match = re.match('^(\x03(?:(\d{1,2})(?:,(\d{1,2}))(.?)?)?)', data[i:])
-            # if the colors match eg. \x031,1a, then "a" has same foreground and background color -> invisible
-            if match and match.group(2) == match.group(3):
-                if match.group(4) and ord(match.group(4)) > 31:
-                    c = match.group(0)[:-1] + ' '
-                else:
-                    c = match.group(0)
-                i += len(c) - 1
-        i += 1
-        stripped_data += c
-    return stripped_data
-
-
-def decode_html(data):
-    """Decode dumb html"""
-    h = HTMLParser()
-    return h.unescape(data)
 
 
 # Enum sort of
@@ -551,15 +457,20 @@ class IRCBot(asynchat.async_chat):
         self.send_privmsg(self.invite_nickname, self.invite_message)
         self.join(channels, delay=5)
 
-    def add_event_handler(self, func, command=None, msg=None):
+    def add_event_handler(self, func, command=None):
+        """
+
+        :param func: Event handler function
+        :param command: Command that triggers func
+        :type func: function
+        :return:
+        """
         if not isinstance(command, list):
             command = [command] if command else []
-        if not isinstance(msg, list):
-            msg = [msg] if msg else []
 
-        log.debug('Adding event handler %s for (command=%s, msg=%s)', func.__name__, command, msg)
-        hash = hashlib.md5('.'.join(sorted(command) + sorted(msg)).encode('utf-8'))
-        self.event_handlers[hash] = EventHandler(func, command, msg)
+        log.debug('Adding event handler %s for command=%s', func.__name__, command)
+        hash = hashlib.md5('.'.join(sorted(command)).encode('utf-8'))
+        self.event_handlers[hash] = EventHandler(func, command)
 
     def handle_event(self, msg):
         """Call the proper function that has been set to handle the input message type eg. RPLMOTD"""
@@ -569,45 +480,3 @@ class IRCBot(asynchat.async_chat):
                     cmd = cmd.rstrip('$') + '$'
                     if re.match(cmd, msg.command, re.IGNORECASE):
                         event.func(msg)
-            elif event.msg:
-                for m in event.msg:
-                    m = m.rstrip('$') + '$'
-                    if re.match(m, msg.raw, re.IGNORECASE):
-                        event.func(msg)
-
-
-@python_2_unicode_compatible
-class IRCMessage(object):
-    def __init__(self, msg):
-        rfc_1459 = "^(@(?P<tags>[^ ]*) )?(:(?P<prefix>[^ ]+) +)?(?P<command>[^ ]+)( *(?P<arguments> .+))?"
-        msg_contents = re.match(rfc_1459, msg)
-
-        self.raw = msg
-        self.tags = msg_contents.group('tags')
-        self.prefix = msg_contents.group('prefix')
-        self.from_nick = self.prefix.split('!')[0] if self.prefix and '!' in self.prefix else None
-        self.command = msg_contents.group('command')
-        if self.command.isdigit() and self.command in REPLY_CODES.keys():
-            self.command = REPLY_CODES[self.command]
-        if msg_contents.group('arguments'):
-            args, sep, ext = msg_contents.group('arguments').partition(' :')
-            self.arguments = args.split()
-            if sep:
-                self.arguments.append(ext)
-        else:
-            self.arguments = []
-
-    def __repr__(self):
-        return self.__str__()
-
-    def __str__(self):
-        printable_arguments = printable_unicode_list(self.arguments)
-        tmpl = (
-            "command: {}, "
-            "prefix: {}, "
-            "tags: {}, "
-            "arguments: {}, "
-            "from_nick: {}, "
-            "raw: {}"
-        )
-        return tmpl.format(self.command, self.prefix, self.tags, printable_arguments, self.from_nick, self.raw)
