@@ -53,7 +53,7 @@ class IRCChannelStatus(object):
         }
 
 
-class IRCBot(asynchat.async_chat):
+class SimpleIRCBot(asynchat.async_chat):
     ac_in_buffer_size = 8192
     ac_out_buffer_size = 8192
 
