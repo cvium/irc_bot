@@ -1,6 +1,9 @@
-import re
+from __future__ import unicode_literals, division, absolute_import
+from builtins import *  # pylint: disable=unused-import, redefined-builtin
 
 from future.utils import python_2_unicode_compatible
+
+import re
 
 from irc_bot.utils import printable_unicode_list
 from irc_bot.numeric_replies import REPLY_CODES
