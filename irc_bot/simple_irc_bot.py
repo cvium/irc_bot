@@ -346,7 +346,7 @@ class SimpleIRCBot(asynchat.async_chat):
     def part(self, channels):
         """PARTs from the channel(s)"""
         if channels:
-            log.verbose('PARTing from channels: %s', ','.join(channels))
+            log.info('PARTing from channels: %s', ','.join(channels))
             self.write('PART %s' % ','.join(channels))
 
     def write(self, msg):
