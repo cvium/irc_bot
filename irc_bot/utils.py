@@ -1,10 +1,13 @@
 from __future__ import unicode_literals, division, absolute_import
 from builtins import *  # pylint: disable=unused-import, redefined-builtin
-
+import sys
 import re
 
-from six.moves.html_parser import HTMLParser
-
+if sys.version_info >= (3, 8):
+    import html
+else:
+    from six.moves.html_parser import HTMLParser
+    html = HTMLParser()
 
 def printable_unicode_list(unicode_list):
     return '[{}]'.format(', '.join(str(x) for x in unicode_list))
@@ -44,5 +47,4 @@ def strip_invisible(data):
 
 def decode_html(data):
     """Decode dumb html"""
-    h = HTMLParser()
-    return h.unescape(data)
+    return html.unescape(data)
