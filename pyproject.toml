@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "irc_bot"
-version = "1.0.37"
+version = "1.0.40"
 description = "A small library to create an IRC bot. Uses asyncore to ensure compatibility with Python 2.7+."
 authors = ["Claus Vium <clausvium@gmail.com>"]
 license = "MIT"
