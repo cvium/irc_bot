@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "irc_bot"
+version = "1.0.37"
+description = "A small library to create an IRC bot. Uses asyncore to ensure compatibility with Python 2.7+."
+authors = ["Claus Vium <clausvium@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+keywords = ["irc"]
+homepage = "https://github.com/cvium/irc_bot"
+repository = "https://github.com/cvium/irc_bot"
+include = [
+    "LICENSE",
+]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+future = "^0.18.2"
+six = "^1.16.0"
+importlib-metadata = {version = "^1.0", python = "<3.8"}
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
