@@ -65,7 +65,7 @@ class SimpleIRCBot(asynchat.async_chat):
         self.channels = {}
         self.channel_keys = {}
         for channel in config['channels']:
-            parts = channel.split(' ')
+            parts = channel.split(' ', 1)
             if len(parts) > 1:
                 self.add_irc_channel(parts[0])
                 self.add_irc_channel_key(parts[0], parts[1])
