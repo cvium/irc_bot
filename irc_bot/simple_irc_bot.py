@@ -463,7 +463,7 @@ class SimpleIRCBot(asynchat.async_chat):
 
             # Identify with NickServ
             log.info('Identifying with NickServ as %s', self.nickname)
-            self.send_privmsg('NickServ', 'IDENTIFY %s %s' % (self.nickname, self.nickserv_password))
+            self.send_privmsg('NickServ', 'IDENTIFY %s' % self.nickserv_password)
         if self.invite_nickname:
             self.schedule.queue_command(5, self.request_channel_invite)
         else:
