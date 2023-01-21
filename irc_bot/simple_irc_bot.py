@@ -63,8 +63,14 @@ class SimpleIRCBot(asynchat.async_chat):
         self.servers = config['servers']
         self.port = config['port']
         self.channels = {}
+        self.channel_keys = {}
         for channel in config['channels']:
-            self.add_irc_channel(channel)
+            parts = channel.split(' ', 1)
+            if len(parts) > 1:
+                self.add_irc_channel(parts[0])
+                self.add_irc_channel_key(parts[0], parts[1])
+            else:
+                self.add_irc_channel(channel)
         self.nickname = config.get('nickname', 'SimpleIRCBot-%s' % uuid.uuid4())
         self.invite_nickname = config.get('invite_nickname')
         self.invite_message = config.get('invite_message')
@@ -105,6 +111,14 @@ class SimpleIRCBot(asynchat.async_chat):
         if name in self.channels:
             return
         self.channels[name] = status
+
+    # some IRC channels have keys (channel passwords, +k mode)
+    # you can provide one separated by a space after the channel name if necessary, and it will be used when joining the channel
+    def add_irc_channel_key(self, name, key):
+        name = name.lower() # doing this lower casing because other things here do it, it isn't relevant to keys specifically
+        if name in self.channel_keys:
+            return
+        self.channel_keys[name] = key
 
     def handle_expt_event(self):
         error = self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
@@ -208,8 +222,13 @@ class SimpleIRCBot(asynchat.async_chat):
             channel = channel.lower()
             if channel in self.channels and self.channels[channel] in illegal_statuses:
                 continue
-            log.info('Joining channel: %s', channel)
-            self.write('JOIN %s' % channel)
+
+            if channel in self.channel_keys:
+                log.info('Joining channel with key: %s', channel)
+                self.write('JOIN %s %s' % (channel, self.channel_keys[channel]))
+            else:    
+                log.info('Joining channel: %s', channel)
+                self.write('JOIN %s' % channel)
 
     def found_terminator(self):
         lines = self._process_message(self.buffer)
